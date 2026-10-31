@@ -49,6 +49,10 @@ interface NoteDao {
     @Query("SELECT COUNT(*) FROM notes WHERE categoryId = :categoryId")
     suspend fun countIn(categoryId: Long): Int
 
+    /** 设置 / 清除某条笔记的定时提醒 */
+    @Query("UPDATE notes SET reminderAt = :at, updatedAt = :now WHERE id = :id")
+    suspend fun setReminder(id: Long, at: Long?, now: Long = System.currentTimeMillis())
+
     /** 每个分类有多少条笔记 */
     @Query("SELECT categoryId AS categoryId, COUNT(*) AS count FROM notes GROUP BY categoryId")
     suspend fun countsByCategory(): List<CategoryCount>

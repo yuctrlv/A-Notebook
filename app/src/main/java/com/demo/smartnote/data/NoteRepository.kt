@@ -35,6 +35,11 @@ class NoteRepository(
 
     suspend fun deleteNote(id: Long) = noteDao.deleteById(id)
 
+    suspend fun getNote(id: Long): Note? = noteDao.getById(id)
+
+    /** 设置 / 清除笔记的定时提醒（只改 reminderAt，不动正文） */
+    suspend fun setReminder(id: Long, at: Long?) = noteDao.setReminder(id, at)
+
     // ---------- 分类 ----------
 
     fun observeCategories(): Flow<List<Category>> = categoryDao.observeAll()

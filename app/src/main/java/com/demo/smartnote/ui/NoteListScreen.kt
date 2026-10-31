@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
@@ -33,6 +34,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -57,7 +59,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.demo.smartnote.R
 import com.demo.smartnote.data.Category
 import com.demo.smartnote.data.Note
 import java.text.SimpleDateFormat
@@ -74,7 +78,8 @@ import java.util.Locale
 fun NoteListScreen(
     viewModel: NotesViewModel,
     onAddNote: () -> Unit,
-    onOpenNote: (Long) -> Unit
+    onOpenNote: (Long) -> Unit,
+    onOpenTasks: () -> Unit
 ) {
     val notes by viewModel.notes.collectAsStateWithLifecycle()
     val selectedId by viewModel.selectedCategoryId.collectAsStateWithLifecycle()
@@ -82,6 +87,14 @@ fun NoteListScreen(
     val counts by viewModel.counts.collectAsStateWithLifecycle()
     val totalCount by viewModel.totalCount.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
+    val progress by viewModel.progress.collectAsStateWithLifecycle()
+    val reminder by viewModel.reminder.collectAsStateWithLifecycle()
+
+    // 长按笔记后的操作菜单
+    var noteMenuTarget by remember { mutableStateOf<Note?>(null) }
+    var noteRenameTarget by remember { mutableStateOf<Note?>(null) }
+    var noteReminderTarget by remember { mutableStateOf<Note?>(null) }
+    var noteDeleteTarget by remember { mutableStateOf<Note?>(null) }
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -138,6 +151,15 @@ fun NoteListScreen(
                     selectedIndex = categories.indexOfFirst { it.id == selectedId }
                 )
             }
+            item {
+                TodayTasksCard(
+                    done = progress.first,
+                    total = progress.second,
+                    reminderText = if (reminder.enabled) reminder.timeText else null,
+                    onClick = onOpenTasks,
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                )
+            }
             if (notes.isEmpty()) {
                 item { EmptyState(hasFilter = selectedId != null, onAddNote = onAddNote) }
             } else {
@@ -147,6 +169,7 @@ fun NoteListScreen(
                         category = categories.firstOrNull { it.id == note.categoryId },
                         toneIndex = categories.indexOfFirst { it.id == note.categoryId },
                         onClick = { onOpenNote(note.id) },
+                        onLongClick = { noteMenuTarget = note },
                         modifier = Modifier.padding(horizontal = 20.dp)
                     )
                 }
@@ -255,6 +278,129 @@ fun NoteListScreen(
             },
             dismissButton = {
                 TextButton(onClick = { deletingTarget = null }) { Text("取消") }
+            }
+        )
+    }
+
+    // ---------- 长按笔记：操作菜单 ----------
+    val menuNote = noteMenuTarget
+    if (menuNote != null) {
+        ModalBottomSheet(onDismissRequest = { noteMenuTarget = null }) {
+            Column(modifier = Modifier.navigationBarsPadding()) {
+                Text(
+                    text = menuNote.displayTitle.ifBlank { "无题" },
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                )
+                ListItem(
+                    headlineContent = { Text("编辑") },
+                    leadingContent = { Icon(Icons.Default.Edit, contentDescription = null) },
+                    modifier = Modifier.combinedClickable(onClick = {
+                        noteMenuTarget = null
+                        onOpenNote(menuNote.id)
+                    })
+                )
+                ListItem(
+                    headlineContent = { Text("重命名") },
+                    leadingContent = {
+                        Text(
+                            text = "Aa",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        )
+                    },
+                    modifier = Modifier.combinedClickable(onClick = {
+                        noteMenuTarget = null
+                        noteRenameTarget = menuNote
+                    })
+                )
+                ListItem(
+                    headlineContent = { Text("定时提醒") },
+                    supportingContent = {
+                        Text(
+                            menuNote.reminderAt?.let { "已设置：${formatReminder(it)}" }
+                                ?: "到点弹通知，提醒你回来看这条"
+                        )
+                    },
+                    leadingContent = {
+                        Icon(painterResource(R.drawable.ic_alarm), contentDescription = null)
+                    },
+                    modifier = Modifier.combinedClickable(onClick = {
+                        noteMenuTarget = null
+                        noteReminderTarget = menuNote
+                    })
+                )
+                if (menuNote.reminderAt != null) {
+                    ListItem(
+                        headlineContent = { Text("清除提醒") },
+                        leadingContent = { Icon(Icons.Default.Close, contentDescription = null) },
+                        modifier = Modifier.combinedClickable(onClick = {
+                            noteMenuTarget = null
+                            viewModel.clearNoteReminder(menuNote)
+                        })
+                    )
+                }
+                ListItem(
+                    headlineContent = { Text("删除") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    },
+                    modifier = Modifier.combinedClickable(onClick = {
+                        noteMenuTarget = null
+                        noteDeleteTarget = menuNote
+                    })
+                )
+                Spacer(Modifier.height(16.dp))
+            }
+        }
+    }
+
+    // ---------- 笔记重命名 ----------
+    val renamingNote = noteRenameTarget
+    if (renamingNote != null) {
+        NoteTitleDialog(
+            initial = renamingNote.title,
+            onDismiss = { noteRenameTarget = null },
+            onConfirm = { title ->
+                noteRenameTarget = null
+                viewModel.renameNote(renamingNote, title)
+            }
+        )
+    }
+
+    // ---------- 笔记定时提醒 ----------
+    val reminderNote = noteReminderTarget
+    if (reminderNote != null) {
+        ReminderTimeDialog(
+            onDismiss = { noteReminderTarget = null },
+            onPick = { atMillis ->
+                noteReminderTarget = null
+                viewModel.setNoteReminder(reminderNote, atMillis)
+            }
+        )
+    }
+
+    // ---------- 笔记删除确认 ----------
+    val deletingNote = noteDeleteTarget
+    if (deletingNote != null) {
+        AlertDialog(
+            onDismissRequest = { noteDeleteTarget = null },
+            title = { Text("删除这条笔记？") },
+            text = { Text("「${deletingNote.displayTitle.ifBlank { "无题" }}」删除后无法恢复。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    noteDeleteTarget = null
+                    viewModel.delete(deletingNote.id)
+                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { noteDeleteTarget = null }) { Text("取消") }
             }
         )
     }
@@ -404,18 +550,21 @@ private fun Header(totalCount: Int, selectedName: String?, selectedIndex: Int) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun NoteCard(
     note: Note,
     category: Category?,
     toneIndex: Int,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val tone = categoryTone(toneIndex)
     Surface(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         color = tone.first,
         contentColor = tone.second,
         shape = RoundedCornerShape(26.dp)
@@ -465,6 +614,22 @@ private fun NoteCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = tone.second.copy(alpha = 0.6f)
                 )
+                val reminderAt = note.reminderAt
+                if (reminderAt != null && reminderAt > System.currentTimeMillis()) {
+                    Spacer(Modifier.width(10.dp))
+                    Icon(
+                        painterResource(R.drawable.ic_alarm),
+                        contentDescription = null,
+                        tint = tone.second.copy(alpha = 0.7f),
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Spacer(Modifier.width(3.dp))
+                    Text(
+                        text = formatReminder(reminderAt),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = tone.second.copy(alpha = 0.7f)
+                    )
+                }
                 Spacer(Modifier.weight(1f))
                 Text(
                     text = "${note.content.length} 字",
@@ -514,6 +679,159 @@ fun CategoryBadge(name: String, toneIndex: Int) {
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
         )
+    }
+}
+
+/**
+ * 首页顶部的「今日任务」卡片：显示进度，点进去管理任务和提醒。
+ */
+@Composable
+private fun TodayTasksCard(
+    done: Int,
+    total: Int,
+    reminderText: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(26.dp),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.09f)
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    painterResource(R.drawable.ic_alarm),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("今日任务", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    text = if (total == 0) "去添加" else "$done / $total",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            if (total > 0) {
+                Spacer(Modifier.height(12.dp))
+                LinearProgressIndicator(
+                    progress = { done.toFloat() / total },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp),
+                    strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = when {
+                    total == 0 -> "还没有任务，点这里加几个每天要做的事"
+                    done == total -> "今天的任务都完成了 🎉"
+                    reminderText != null -> "还有 ${total - done} 个没完成 · 每天 $reminderText 提醒"
+                    else -> "还有 ${total - done} 个没完成"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+/** 重命名笔记标题的弹窗（标题可以留空，列表会自动用正文前 30 字） */
+@Composable
+private fun NoteTitleDialog(
+    initial: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var title by remember { mutableStateOf(initial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("重命名") },
+        text = {
+            OutlinedTextField(
+                value = title,
+                onValueChange = { title = it },
+                singleLine = true,
+                label = { Text("标题（可留空）") },
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = { Button(onClick = { onConfirm(title) }) { Text("保存") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+    )
+}
+
+/** 笔记定时提醒的快捷选择 */
+@Composable
+private fun ReminderTimeDialog(
+    onDismiss: () -> Unit,
+    onPick: (Long) -> Unit
+) {
+    val presets = remember {
+        val now = Calendar.getInstance()
+        fun afterMinutes(minutes: Int) = now.timeInMillis + minutes * 60_000L
+        val tonight = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 20)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+            if (timeInMillis <= now.timeInMillis) add(Calendar.DAY_OF_YEAR, 1)
+        }
+        val tomorrowMorning = Calendar.getInstance().apply {
+            add(Calendar.DAY_OF_YEAR, 1)
+            set(Calendar.HOUR_OF_DAY, 9)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        listOf(
+            "10 分钟后" to afterMinutes(10),
+            "1 小时后" to afterMinutes(60),
+            "今晚 20:00" to tonight.timeInMillis,
+            "明天 09:00" to tomorrowMorning.timeInMillis
+        )
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("什么时候提醒你？") },
+        text = {
+            Column {
+                presets.forEach { (label, at) ->
+                    TextButton(
+                        onClick = { onPick(at) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(label, modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+    )
+}
+
+/** 提醒时间的展示文案：今天 / 明天 / 具体日期 */
+internal fun formatReminder(millis: Long): String {
+    val now = Calendar.getInstance()
+    val then = Calendar.getInstance().apply { timeInMillis = millis }
+    val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(millis))
+    val sameDay = now.get(Calendar.YEAR) == then.get(Calendar.YEAR) &&
+        now.get(Calendar.DAY_OF_YEAR) == then.get(Calendar.DAY_OF_YEAR)
+    val tomorrow = now.clone() as Calendar
+    tomorrow.add(Calendar.DAY_OF_YEAR, 1)
+    val isTomorrow = tomorrow.get(Calendar.YEAR) == then.get(Calendar.YEAR) &&
+        tomorrow.get(Calendar.DAY_OF_YEAR) == then.get(Calendar.DAY_OF_YEAR)
+    return when {
+        sameDay -> "今天 $time"
+        isTomorrow -> "明天 $time"
+        else -> SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(millis))
     }
 }
 

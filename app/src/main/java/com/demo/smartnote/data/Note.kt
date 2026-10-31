@@ -18,7 +18,9 @@ data class Note(
     /** 所属分类 id，指向 categories 表 */
     val categoryId: Long = 0L,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    /** 定时提醒的时间戳；null 表示没设提醒 */
+    val reminderAt: Long? = null
 ) {
     /** 列表页展示用的标题：没有标题就取正文前 30 个字 */
     val displayTitle: String

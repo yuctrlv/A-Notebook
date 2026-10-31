@@ -8,18 +8,34 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 
 /**
- * 路由：list -> detail/{id} -> edit?noteId=xx
+ * 路由：list -> detail/{id} -> edit?noteId=xx；list -> tasks
+ *
+ * @param startDestination 从通知点进来时直接落到 "tasks"
  */
 @Composable
-fun SmartNoteNavHost(viewModel: NotesViewModel) {
+fun SmartNoteNavHost(
+    viewModel: NotesViewModel,
+    startDestination: String = "list"
+) {
     val navController = rememberNavController()
 
-    NavHost(navController = navController, startDestination = "list") {
+    NavHost(navController = navController, startDestination = startDestination) {
         composable("list") {
             NoteListScreen(
                 viewModel = viewModel,
                 onAddNote = { navController.navigate("edit") },
-                onOpenNote = { id -> navController.navigate("detail/$id") }
+                onOpenNote = { id -> navController.navigate("detail/$id") },
+                onOpenTasks = { navController.navigate("tasks") }
+            )
+        }
+
+        composable("tasks") {
+            TasksScreen(
+                viewModel = viewModel,
+                onBack = {
+                    // 从通知直接进来的话，返回应该回首页而不是退出
+                    if (!navController.popBackStack()) navController.navigate("list")
+                }
             )
         }
 
