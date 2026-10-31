@@ -4,6 +4,12 @@
 
 全部数据存在手机本地（Room / SQLite），不联网、不用登录。
 
+## 下载
+
+最新版 APK：[Releases](https://github.com/yuctrlv/A-Notebook/releases/latest)
+
+> 支持 Android 8.0（API 26）及以上。如果手机里装过调试版，需要先卸载再装（签名不同）。
+
 ## 截图
 
 | 首页 | 提醒 | 今日任务 |
