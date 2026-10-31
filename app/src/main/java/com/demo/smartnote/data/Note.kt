@@ -15,7 +15,8 @@ data class Note(
     val title: String = "",
     /** 正文，不能为空 */
     val content: String = "",
-    val category: NoteCategory = NoteCategory.OTHER,
+    /** 所属分类 id，指向 categories 表 */
+    val categoryId: Long = 0L,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 ) {

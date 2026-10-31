@@ -60,6 +60,7 @@ fun NoteDetailScreen(
     onEdit: (Long) -> Unit
 ) {
     val note by viewModel.observeNote(noteId).collectAsStateWithLifecycle(initialValue = null)
+    val categories by viewModel.categories.collectAsStateWithLifecycle()
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
@@ -112,7 +113,10 @@ fun NoteDetailScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp, vertical = 12.dp)
             ) {
-                CategoryBadge(current.category)
+                CategoryBadge(
+                    name = categories.nameOf(current.categoryId),
+                    toneIndex = categories.indexOfFirst { it.id == current.categoryId }
+                )
                 Spacer(Modifier.height(12.dp))
                 Text(
                     text = current.displayTitle.ifBlank { "（无标题）" },

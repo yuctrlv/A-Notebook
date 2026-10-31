@@ -11,5 +11,7 @@ class SmartNoteApplication : Application() {
 
     val database: NoteDatabase by lazy { NoteDatabase.get(this) }
 
-    val repository: NoteRepository by lazy { NoteRepository(database.noteDao()) }
+    val repository: NoteRepository by lazy {
+        NoteRepository(database.noteDao(), database.categoryDao())
+    }
 }
