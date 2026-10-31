@@ -31,8 +31,11 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
@@ -43,8 +46,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -65,6 +71,11 @@ import com.demo.smartnote.R
 import com.demo.smartnote.data.Category
 import com.demo.smartnote.data.Note
 import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.ZoneOffset
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -94,6 +105,7 @@ fun NoteListScreen(
     var noteMenuTarget by remember { mutableStateOf<Note?>(null) }
     var noteRenameTarget by remember { mutableStateOf<Note?>(null) }
     var noteReminderTarget by remember { mutableStateOf<Note?>(null) }
+    var noteReminderCustom by remember { mutableStateOf(false) }
     var noteDeleteTarget by remember { mutableStateOf<Note?>(null) }
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -377,13 +389,29 @@ fun NoteListScreen(
     // ---------- 笔记定时提醒 ----------
     val reminderNote = noteReminderTarget
     if (reminderNote != null) {
-        ReminderTimeDialog(
-            onDismiss = { noteReminderTarget = null },
-            onPick = { atMillis ->
-                noteReminderTarget = null
-                viewModel.setNoteReminder(reminderNote, atMillis)
-            }
-        )
+        if (noteReminderCustom) {
+            NoteReminderCustomPicker(
+                initial = reminderNote.reminderAt,
+                onDismiss = {
+                    noteReminderTarget = null
+                    noteReminderCustom = false
+                },
+                onConfirm = { atMillis ->
+                    noteReminderTarget = null
+                    noteReminderCustom = false
+                    viewModel.setNoteReminder(reminderNote, atMillis)
+                }
+            )
+        } else {
+            ReminderOptionsDialog(
+                onDismiss = { noteReminderTarget = null },
+                onPick = { atMillis ->
+                    noteReminderTarget = null
+                    viewModel.setNoteReminder(reminderNote, atMillis)
+                },
+                onCustom = { noteReminderCustom = true }
+            )
+        }
     }
 
     // ---------- 笔记删除确认 ----------
@@ -766,48 +794,161 @@ private fun NoteTitleDialog(
     )
 }
 
-/** 笔记定时提醒的快捷选择 */
+/**
+ * 自定义提醒时间：24 小时制自由选时间，日期默认今天，点「换日期」可改哪天；
+ * 如果选的时间已经过了，自动顺延到明天。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ReminderTimeDialog(
+private fun NoteReminderCustomPicker(
+    initial: Long?,
     onDismiss: () -> Unit,
-    onPick: (Long) -> Unit
+    onConfirm: (Long) -> Unit
 ) {
-    val presets = remember {
-        val now = Calendar.getInstance()
-        fun afterMinutes(minutes: Int) = now.timeInMillis + minutes * 60_000L
-        val tonight = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 20)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-            if (timeInMillis <= now.timeInMillis) add(Calendar.DAY_OF_YEAR, 1)
-        }
-        val tomorrowMorning = Calendar.getInstance().apply {
-            add(Calendar.DAY_OF_YEAR, 1)
-            set(Calendar.HOUR_OF_DAY, 9)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
+    val initialZoned = initial?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()) }
+    val today = LocalDate.now()
+    var date by remember {
+        mutableStateOf(initialZoned?.toLocalDate() ?: today)
+    }
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    val timeState = rememberTimePickerState(
+        initialHour = initialZoned?.hour ?: 20,
+        initialMinute = initialZoned?.minute ?: 0,
+        is24Hour = true
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("几点提醒？") },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = when (date) {
+                            today -> "今天"
+                            today.plusDays(1) -> "明天"
+                            else -> "${date.monthValue} 月 ${date.dayOfMonth} 日"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = { showDatePicker = true }) { Text("换日期") }
+                }
+                TimePicker(state = timeState)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                var at = date
+                    .atTime(timeState.hour, timeState.minute)
+                    .atZone(ZoneId.systemDefault())
+                    .toInstant()
+                    .toEpochMilli()
+                // 选的是今天但时间已经过了，就顺延到明天
+                if (at <= System.currentTimeMillis()) at += 24 * 60 * 60 * 1000L
+                onConfirm(at)
+            }) { Text("确定") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+    )
+
+    if (showDatePicker) {
+        val dateState = rememberDatePickerState(
+            initialSelectedDateMillis = date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    dateState.selectedDateMillis?.let {
+                        date = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()
+                    }
+                    showDatePicker = false
+                }) { Text("确定") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("取消") }
+            }
+        ) { DatePicker(state = dateState) }
+    }
+}
+
+/**
+ * 提醒方式选择：几个常用快捷项（5 / 10 / 30 分钟、1 小时）＋「自定义时间」。
+ * 每行右侧顺便显示「几点会响」，不用自己算。
+ */
+@Composable
+private fun ReminderOptionsDialog(
+    onDismiss: () -> Unit,
+    onPick: (Long) -> Unit,
+    onCustom: () -> Unit
+) {
+    val options = remember {
+        val now = System.currentTimeMillis()
         listOf(
-            "10 分钟后" to afterMinutes(10),
-            "1 小时后" to afterMinutes(60),
-            "今晚 20:00" to tonight.timeInMillis,
-            "明天 09:00" to tomorrowMorning.timeInMillis
+            "5 分钟后" to now + 5 * 60_000L,
+            "10 分钟后" to now + 10 * 60_000L,
+            "30 分钟后" to now + 30 * 60_000L,
+            "1 小时后" to now + 60 * 60_000L
         )
     }
-
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("什么时候提醒你？") },
         text = {
             Column {
-                presets.forEach { (label, at) ->
-                    TextButton(
+                options.forEach { (label, at) ->
+                    Surface(
                         onClick = { onPick(at) },
+                        shape = RoundedCornerShape(18.dp),
+                        color = Color.Transparent,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(label, modifier = Modifier.weight(1f))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 14.dp)
+                        ) {
+                            Icon(
+                                painterResource(R.drawable.ic_alarm),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(label, style = MaterialTheme.typography.bodyLarge)
+                            Spacer(Modifier.weight(1f))
+                            Text(
+                                text = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(at)),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                Surface(
+                    onClick = onCustom,
+                    shape = RoundedCornerShape(18.dp),
+                    color = Color.Transparent,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 14.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text("自定义时间…", style = MaterialTheme.typography.bodyLarge)
                     }
                 }
             }
