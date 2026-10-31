@@ -1,6 +1,8 @@
 package com.demo.smartnote.ui
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,8 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -33,9 +34,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -44,14 +44,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.demo.smartnote.data.Note
 import com.demo.smartnote.data.NoteCategory
 import java.text.SimpleDateFormat
-import java.time.LocalDate
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
 /**
- * 首页：一张摊开的纸。
- * 上面是日期和书名，中间是分类索引，下面是按时间排的条目。
+ * 首页：Material 3 Expressive 风格。
+ * 大标题 + 会滑动的分类选择块 + 大圆角彩色卡片。
  */
 @Composable
 fun NoteListScreen(
@@ -67,83 +66,87 @@ fun NoteListScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
-            FloatingActionButton(
+            ExtendedFloatingActionButton(
                 onClick = onAddNote,
-                containerColor = MaterialTheme.colorScheme.secondary,
-                contentColor = MaterialTheme.colorScheme.onSecondary,
-                shape = CircleShape
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "新建笔记")
-            }
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = RoundedCornerShape(22.dp),
+                icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                text = { Text("记一笔", fontWeight = FontWeight.Bold) }
+            )
         }
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentPadding = PaddingValues(bottom = 96.dp)
+            contentPadding = PaddingValues(bottom = 120.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            item { Masthead(totalCount = totalCount) }
             item {
-                IndexTabs(
+                Header(
+                    totalCount = totalCount,
+                    selectedCategory = selectedCategory
+                )
+            }
+            item {
+                CategorySwitcher(
                     selected = selectedCategory,
                     counts = counts,
                     totalCount = totalCount,
                     onSelect = viewModel::selectCategory
                 )
             }
-
             if (notes.isEmpty()) {
                 item { EmptyState(hasFilter = selectedCategory != null, onAddNote = onAddNote) }
             } else {
                 items(notes, key = { it.id }) { note ->
-                    NoteEntry(note = note, onClick = { onOpenNote(note.id) })
+                    NoteCard(
+                        note = note,
+                        onClick = { onOpenNote(note.id) },
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    )
                 }
             }
         }
     }
 }
 
-/** 报头：日期 + 书名 + 双线 */
 @Composable
-private fun Masthead(totalCount: Int) {
-    val today = LocalDate.now()
-    val week = listOf("星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日")[today.dayOfWeek.value - 1]
-    Column(modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 36.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "${today.monthValue} 月 ${today.dayOfMonth} 日 · $week",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.weight(1f))
-            Text(
-                text = "$totalCount 则",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Spacer(Modifier.height(10.dp))
+private fun Header(totalCount: Int, selectedCategory: NoteCategory?) {
+    Column(modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 32.dp)) {
         Text(
             text = "一个笔记本",
-            fontFamily = FontFamily.Serif,
-            fontSize = 38.sp,
-            lineHeight = 44.sp,
-            fontWeight = FontWeight.Normal,
-            letterSpacing = 2.sp,
+            style = MaterialTheme.typography.displaySmall,
+            fontSize = 34.sp,
+            lineHeight = 40.sp,
             color = MaterialTheme.colorScheme.onBackground
         )
-        Spacer(Modifier.height(14.dp))
-        HorizontalDivider(thickness = 1.5.dp, color = MaterialTheme.colorScheme.onBackground)
-        Spacer(Modifier.height(3.dp))
-        HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            val label = selectedCategory?.label ?: "全部"
+            Text(
+                text = "$label · $totalCount 条",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(
+                        selectedCategory?.let { categoryTone(it).first }
+                            ?: MaterialTheme.colorScheme.primary
+                    )
+            )
+        }
     }
 }
 
-/** 分类索引：像书页边上的索引标签，纯文字 + 下划线 */
+/** 分类切换：一个整体凹槽，选中的块会滑过去（颜色 + 圆角动画） */
 @Composable
-private fun IndexTabs(
+private fun CategorySwitcher(
     selected: NoteCategory?,
     counts: Map<NoteCategory, Int>,
     totalCount: Int,
@@ -151,102 +154,119 @@ private fun IndexTabs(
 ) {
     LazyRow(
         contentPadding = PaddingValues(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(22.dp)
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item {
-            IndexTab(
+            SwitcherItem(
                 label = "全部",
                 count = totalCount,
                 selected = selected == null,
-                accent = MaterialTheme.colorScheme.onBackground,
+                tone = categoryTone(null),
                 onClick = { onSelect(null) }
             )
         }
         items(NoteCategory.entries) { category ->
-            IndexTab(
+            SwitcherItem(
                 label = category.label,
                 count = counts[category] ?: 0,
                 selected = selected == category,
-                accent = categoryColor(category),
+                tone = categoryTone(category),
                 onClick = { onSelect(category) }
             )
         }
     }
-    Spacer(Modifier.height(8.dp))
-    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
 }
 
 @Composable
-private fun IndexTab(label: String, count: Int, selected: Boolean, accent: Color, onClick: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .padding(top = 12.dp, bottom = 10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+private fun SwitcherItem(
+    label: String,
+    count: Int,
+    selected: Boolean,
+    tone: Pair<Color, Color>,
+    onClick: () -> Unit
+) {
+    val container by animateColorAsState(
+        targetValue = if (selected) tone.first else MaterialTheme.colorScheme.surfaceContainerHigh,
+        animationSpec = spring(dampingRatio = 0.8f, stiffness = 700f),
+        label = "switcher-container"
+    )
+    val content by animateColorAsState(
+        targetValue = if (selected) tone.second else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = spring(dampingRatio = 0.8f, stiffness = 700f),
+        label = "switcher-content"
+    )
+    val corner by animateDpAsState(
+        targetValue = if (selected) 20.dp else 20.dp,
+        animationSpec = spring(dampingRatio = 0.8f, stiffness = 700f),
+        label = "switcher-corner"
+    )
+
+    Surface(
+        onClick = onClick,
+        color = container,
+        contentColor = content,
+        shape = RoundedCornerShape(corner)
     ) {
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                text = label,
-                fontFamily = FontFamily.Serif,
-                fontSize = 16.sp,
-                color = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
-            )
+        Row(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 11.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = label, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
             if (count > 0) {
-                Spacer(Modifier.width(3.dp))
+                Spacer(Modifier.width(6.dp))
                 Text(
                     text = count.toString(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (selected) accent else MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(bottom = 3.dp)
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = content.copy(alpha = 0.7f)
                 )
             }
         }
-        Spacer(Modifier.height(6.dp))
-        Box(
-            modifier = Modifier
-                .height(2.dp)
-                .width(if (selected) 26.dp else 0.dp)
-                .background(accent)
-        )
     }
 }
 
-/** 单条笔记：像手账里贴上去的一张卡片 */
 @Composable
-private fun NoteEntry(note: Note, onClick: () -> Unit) {
+private fun NoteCard(note: Note, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val tone = categoryTone(note.category)
     Surface(
         onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 7.dp),
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(3.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        modifier = modifier.fillMaxWidth(),
+        color = tone.first,
+        contentColor = tone.second,
+        shape = RoundedCornerShape(26.dp)
     ) {
-        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
                 Text(
                     text = note.displayTitle.ifBlank { "无题" },
-                    fontFamily = FontFamily.Serif,
-                    fontSize = 19.sp,
-                    lineHeight = 26.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontSize = 20.sp,
+                    lineHeight = 27.sp,
+                    color = tone.second,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(Modifier.width(12.dp))
-                CategoryBadge(note.category)
+                Surface(
+                    color = tone.second.copy(alpha = 0.10f),
+                    contentColor = tone.second,
+                    shape = CircleShape
+                ) {
+                    Text(
+                        text = note.category.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
             }
             if (note.content.isNotBlank()) {
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = note.content.replace("\n", " ").trim(),
-                    fontSize = 14.sp,
-                    lineHeight = 23.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                    lineHeight = 22.sp,
+                    color = tone.second.copy(alpha = 0.78f),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -256,38 +276,54 @@ private fun NoteEntry(note: Note, onClick: () -> Unit) {
                 Text(
                     text = formatTime(note.updatedAt),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline
+                    color = tone.second.copy(alpha = 0.6f)
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
                     text = "${note.content.length} 字",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline
+                    color = tone.second.copy(alpha = 0.6f)
                 )
             }
         }
     }
 }
 
-/** 每个分类一个颜色，像不同颜色的索引标签 */
+/**
+ * 分类配色：每个分类一组「容器色 + 前景色」。
+ * 这是 Expressive 风格的关键——大块浅色底 + 同色系深色字。
+ */
 @Composable
-fun categoryColor(category: NoteCategory): Color = when (category) {
-    NoteCategory.ENGLISH -> Color(0xFF33506B)
-    NoteCategory.QUOTE -> Color(0xFF6E4A6B)
-    NoteCategory.IDIOM -> Color(0xFF3F5A44)
-    NoteCategory.OTHER -> Color(0xFF6F6659)
+fun categoryTone(category: NoteCategory?): Pair<Color, Color> {
+    val dark = androidx.compose.foundation.isSystemInDarkTheme()
+    return when (category) {
+        NoteCategory.ENGLISH ->
+            if (dark) Color(0xFF28306B) to Color(0xFFD9DDFF) else Color(0xFFE3E7FF) to Color(0xFF1B2A6B)
+        NoteCategory.QUOTE ->
+            if (dark) Color(0xFF45255E) to Color(0xFFF0DDFF) else Color(0xFFF2E4FF) to Color(0xFF431C66)
+        NoteCategory.IDIOM ->
+            if (dark) Color(0xFF17453A) to Color(0xFFC9F3E2) else Color(0xFFDDF3E9) to Color(0xFF0C4232)
+        NoteCategory.OTHER ->
+            if (dark) Color(0xFF2E2D38) to Color(0xFFE4E2EC) else Color(0xFFEDECF3) to Color(0xFF3A3946)
+        null ->
+            if (dark) Color(0xFF2B2A3A) to Color(0xFFE4E2FF) else Color(0xFFE9E8FF) to Color(0xFF241F6B)
+    }
 }
 
-/** 分类小标签：斜体衬线 + 颜色，不用色块 */
+@Composable
+fun categoryColor(category: NoteCategory): Color = categoryTone(category).second
+
+/** 详情页顶部的分类标签，沿用同一套配色 */
 @Composable
 fun CategoryBadge(category: NoteCategory) {
-    Text(
-        text = category.label,
-        fontFamily = FontFamily.Serif,
-        fontStyle = FontStyle.Italic,
-        fontSize = 13.sp,
-        color = categoryColor(category)
-    )
+    val tone = categoryTone(category)
+    Surface(color = tone.first, contentColor = tone.second, shape = CircleShape) {
+        Text(
+            text = category.label,
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+        )
+    }
 }
 
 @Composable
@@ -295,34 +331,33 @@ private fun EmptyState(hasFilter: Boolean, onAddNote: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 32.dp, vertical = 64.dp),
+            .padding(horizontal = 32.dp, vertical = 56.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Text(text = if (hasFilter) "🗂" else "✍️", fontSize = 44.sp)
+        Spacer(Modifier.height(14.dp))
         Text(
-            text = if (hasFilter) "这页还空着" else "第一页还是白纸",
-            fontFamily = FontFamily.Serif,
-            fontSize = 20.sp,
+            text = if (hasFilter) "这个分类还是空的" else "还没有笔记",
+            style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = if (hasFilter) "换个分类看看" else "写点什么吧，写下来就忘不掉了",
-            fontSize = 13.sp,
+            text = if (hasFilter) "换个分类看看" else "想到什么就记下来",
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(20.dp))
         Surface(
             onClick = onAddNote,
-            color = Color.Transparent,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            color = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             shape = CircleShape
         ) {
             Text(
-                text = "写第一条",
-                fontFamily = FontFamily.Serif,
-                fontSize = 15.sp,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp)
+                text = "新建笔记",
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
             )
         }
     }

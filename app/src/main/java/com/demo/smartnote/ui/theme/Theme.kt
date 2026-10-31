@@ -7,83 +7,85 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 /**
- * 纸质手账风配色：米白纸 + 墨黑字 + 一点点封面色。
- * 不跟随系统取色，保证任何手机上看都是同一个样子。
+ * Material 3 Expressive 风格配色：
+ * 高饱和主色 + 大块浅色容器 + 大圆角，不再用纸张质感。
  */
-private val Paper = Color(0xFFF7F3EA)
-private val PaperDeep = Color(0xFFEFE8D9)
-private val Card = Color(0xFFFFFDF7)
-private val Ink = Color(0xFF23201C)
-private val InkSoft = Color(0xFF6F6659)
-private val Rule = Color(0xFFDCD2BE)
-private val Seal = Color(0xFF9C4221)     // 印章红
-private val Night = Color(0xFF1B1916)
-private val NightCard = Color(0xFF262320)
-
 private val LightColors = lightColorScheme(
-    primary = Ink,
-    onPrimary = Paper,
-    primaryContainer = PaperDeep,
-    onPrimaryContainer = Ink,
-    secondary = Seal,
-    onSecondary = Paper,
-    secondaryContainer = Color(0xFFF0E0D6),
-    onSecondaryContainer = Color(0xFF5C2A18),
-    tertiary = Color(0xFF3F5A44),
-    background = Paper,
-    onBackground = Ink,
-    surface = Card,
-    onSurface = Ink,
-    surfaceVariant = PaperDeep,
-    onSurfaceVariant = InkSoft,
-    surfaceContainerLow = Card,
-    surfaceContainer = PaperDeep,
-    surfaceContainerHigh = PaperDeep,
-    surfaceContainerHighest = Color(0xFFE6DDCB),
-    outline = Color(0xFF8C8171),
-    outlineVariant = Rule,
-    error = Color(0xFF8C1D18),
-    onError = Paper
+    primary = Color(0xFF4F46E5),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFE2E0FF),
+    onPrimaryContainer = Color(0xFF17105C),
+    secondary = Color(0xFF0F9C8F),
+    onSecondary = Color(0xFFFFFFFF),
+    secondaryContainer = Color(0xFFC9F3EC),
+    onSecondaryContainer = Color(0xFF04352F),
+    tertiary = Color(0xFFF2831B),
+    onTertiary = Color(0xFFFFFFFF),
+    tertiaryContainer = Color(0xFFFFE2C4),
+    onTertiaryContainer = Color(0xFF4A2400),
+    background = Color(0xFFF7F7FB),
+    onBackground = Color(0xFF14131A),
+    surface = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF14131A),
+    surfaceVariant = Color(0xFFE9E8F0),
+    onSurfaceVariant = Color(0xFF5B5966),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFF5F4FA),
+    surfaceContainer = Color(0xFFEFEEF6),
+    surfaceContainerHigh = Color(0xFFE8E7F1),
+    surfaceContainerHighest = Color(0xFFE1E0EB),
+    outline = Color(0xFF77758A),
+    outlineVariant = Color(0xFFD6D4E0),
+    error = Color(0xFFBA1A1A),
+    onError = Color(0xFFFFFFFF)
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFFE8E0CE),
-    onPrimary = Night,
-    secondary = Color(0xFFE0A183),
-    background = Night,
-    onBackground = Color(0xFFE9E4D9),
-    surface = NightCard,
-    onSurface = Color(0xFFE9E4D9),
-    surfaceVariant = NightCard,
-    onSurfaceVariant = Color(0xFFB3AA9B),
-    surfaceContainerLow = NightCard,
-    surfaceContainer = Color(0xFF221F1C),
-    surfaceContainerHigh = Color(0xFF2B2724),
-    outline = Color(0xFF8F857A),
-    outlineVariant = Color(0xFF3A352F),
-    error = Color(0xFFE8B4AF),
-    onError = Night
+    primary = Color(0xFFBFC1FF),
+    onPrimary = Color(0xFF221B78),
+    primaryContainer = Color(0xFF3A32A0),
+    onPrimaryContainer = Color(0xFFE2E0FF),
+    secondary = Color(0xFF8FE3D6),
+    onSecondary = Color(0xFF003731),
+    secondaryContainer = Color(0xFF0B5D55),
+    onSecondaryContainer = Color(0xFFC9F3EC),
+    tertiary = Color(0xFFFFB86B),
+    onTertiary = Color(0xFF4A2400),
+    tertiaryContainer = Color(0xFF6A3A05),
+    onTertiaryContainer = Color(0xFFFFE2C4),
+    background = Color(0xFF121118),
+    onBackground = Color(0xFFE6E4EE),
+    surface = Color(0xFF1A1922),
+    onSurface = Color(0xFFE6E4EE),
+    surfaceVariant = Color(0xFF2A2933),
+    onSurfaceVariant = Color(0xFFB4B2C2),
+    surfaceContainerLowest = Color(0xFF0D0C12),
+    surfaceContainerLow = Color(0xFF191821),
+    surfaceContainer = Color(0xFF1E1D27),
+    surfaceContainerHigh = Color(0xFF26252F),
+    surfaceContainerHighest = Color(0xFF302F3A),
+    outline = Color(0xFF918FA3),
+    outlineVariant = Color(0xFF3D3B49),
+    error = Color(0xFFFFB4AB),
+    onError = Color(0xFF690005)
 )
 
-/** 标题用衬线体，正文用系统无衬线，做出「印刷笔记本」的味道 */
+/** 字重对比拉开：标题很粗，辅助信息很轻 */
 private val AppTypography = Typography().let { base ->
     base.copy(
-        displaySmall = base.displaySmall.copy(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Normal),
-        headlineMedium = base.headlineMedium.copy(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Normal),
-        headlineSmall = base.headlineSmall.copy(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Normal),
-        titleLarge = base.titleLarge.copy(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Medium),
-        titleMedium = base.titleMedium.copy(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Medium),
-        labelSmall = TextStyle(
-            fontFamily = FontFamily.Monospace,
-            fontSize = 11.sp,
-            letterSpacing = 0.6.sp
-        )
+        displaySmall = base.displaySmall.copy(fontWeight = FontWeight.Black, letterSpacing = (-1).sp),
+        headlineMedium = base.headlineMedium.copy(fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.5).sp),
+        headlineSmall = base.headlineSmall.copy(fontWeight = FontWeight.Bold),
+        titleLarge = base.titleLarge.copy(fontWeight = FontWeight.Bold),
+        titleMedium = base.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+        bodyLarge = base.bodyLarge.copy(fontWeight = FontWeight.Normal, lineHeight = 24.sp),
+        labelLarge = base.labelLarge.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.2.sp),
+        labelSmall = base.labelSmall.copy(fontWeight = FontWeight.Medium, letterSpacing = 0.3.sp)
     )
 }
 
