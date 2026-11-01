@@ -23,7 +23,10 @@ fun SmartNoteNavHost(
         composable("list") {
             NoteListScreen(
                 viewModel = viewModel,
-                onAddNote = { navController.navigate("edit") },
+                onAddNote = { categoryId ->
+                    // 把当前选中的分类带过去，新建页就不用再手动选一次
+                    navController.navigate("edit?categoryId=${categoryId ?: -1L}")
+                },
                 onOpenNote = { id -> navController.navigate("detail/$id") },
                 onOpenTasks = { navController.navigate("tasks") }
             )
@@ -40,17 +43,23 @@ fun SmartNoteNavHost(
         }
 
         composable(
-            route = "edit?noteId={noteId}",
+            route = "edit?noteId={noteId}&categoryId={categoryId}",
             arguments = listOf(
                 navArgument("noteId") {
+                    type = NavType.LongType
+                    defaultValue = -1L
+                },
+                navArgument("categoryId") {
                     type = NavType.LongType
                     defaultValue = -1L
                 }
             )
         ) { entry ->
             val id = entry.arguments?.getLong("noteId")?.takeIf { it > 0 }
+            val presetCategoryId = entry.arguments?.getLong("categoryId")?.takeIf { it > 0 }
             NoteEditScreen(
                 noteId = id,
+                initialCategoryId = presetCategoryId,
                 viewModel = viewModel,
                 onDone = { navController.popBackStack() }
             )
