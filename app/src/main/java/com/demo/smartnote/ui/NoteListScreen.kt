@@ -88,7 +88,8 @@ import java.util.Locale
 @Composable
 fun NoteListScreen(
     viewModel: NotesViewModel,
-    onAddNote: () -> Unit,
+    /** 入参是「当前选中的分类」，null 表示在「全部」里新建 */
+    onAddNote: (Long?) -> Unit,
     onOpenNote: (Long) -> Unit,
     onOpenTasks: () -> Unit
 ) {
@@ -140,7 +141,7 @@ fun NoteListScreen(
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = onAddNote,
+                onClick = { onAddNote(selectedId) },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 shape = RoundedCornerShape(22.dp),
@@ -173,7 +174,7 @@ fun NoteListScreen(
                 )
             }
             if (notes.isEmpty()) {
-                item { EmptyState(hasFilter = selectedId != null, onAddNote = onAddNote) }
+                item { EmptyState(hasFilter = selectedId != null, onAddNote = { onAddNote(selectedId) }) }
             } else {
                 items(notes, key = { it.id }) { note ->
                     NoteCard(

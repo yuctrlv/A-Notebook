@@ -42,13 +42,17 @@ import com.demo.smartnote.data.Note
 
 /**
  * 新建 / 编辑页。noteId 为 null 表示新建。
+ *
+ * @param initialCategoryId 从某个分类里点「记一笔」时带过来的分类 id；
+ *        为空或该分类已被删掉时，退回兜底分类（「其他」）。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NoteEditScreen(
     noteId: Long?,
     viewModel: NotesViewModel,
-    onDone: () -> Unit
+    onDone: () -> Unit,
+    initialCategoryId: Long? = null
 ) {
     val existing by viewModel
         .observeNote(noteId ?: -1L)
@@ -60,10 +64,13 @@ fun NoteEditScreen(
     var categoryId by remember(noteId) { mutableStateOf(0L) }
     var loaded by remember(noteId) { mutableStateOf(noteId == null) }
 
-    // 新建笔记：默认落在兜底分类（「其他」），拿不到就取第一个
-    LaunchedEffect(categories, noteId) {
+    // 新建笔记：优先用「当前所在分类」，其次兜底分类（「其他」），再其次第一个分类
+    LaunchedEffect(categories, noteId, initialCategoryId) {
         if (noteId == null && categoryId == 0L && categories.isNotEmpty()) {
-            categoryId = (categories.firstOrNull { it.isDefault } ?: categories.first()).id
+            val preset = initialCategoryId?.let { id -> categories.firstOrNull { it.id == id } }
+            categoryId = (preset
+                ?: categories.firstOrNull { it.isDefault }
+                ?: categories.first()).id
         }
     }
 
